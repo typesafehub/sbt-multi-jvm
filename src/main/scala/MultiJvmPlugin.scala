@@ -28,6 +28,7 @@ object MultiJvmPlugin {
   val extraOptions = SettingKey[String => Seq[String]]("extra-options")
 
   val testRunner = SettingKey[String]("test-runner")
+  val scalatestOptions = SettingKey[Seq[String]]("scalatest-options")
   val testOptions = SettingKey[Seq[String]]("test-lib-options")
   val testClasspath = TaskKey[Classpath]("test-classpath")
   val testScalaOptions = TaskKey[String => Seq[String]]("test-scala-options")
@@ -41,9 +42,9 @@ object MultiJvmPlugin {
 
   lazy val settings = withSettings(
     testRunner := "org.scalatest.tools.Runner",
-    testOptions := defaultTestOptions,
+    scalatestOptions := defaultTestOptions,
     testClasspath <<= managedClasspath map { _.filter(_.data.name.contains("scalatest")) },
-    testScalaOptions <<= (testRunner, testOptions, testClasspath, fullClasspath) map scalaOptionsForScalatest
+    testScalaOptions <<= (testRunner, scalatestOptions, testClasspath, fullClasspath) map scalaOptionsForScalatest
   )
 
   lazy val specs2Settings = withSettings(
@@ -150,18 +151,18 @@ object MultiJvmPlugin {
     log.info(if (log.ansiCodesSupported) GREEN + logName + RESET else logName)
     val processes = classes.zipWithIndex map {
       case (testClass, index) => {
-          val jvmName = "JVM-" + multiIdentifier(testClass, marker)
-          val jvmLogger = new JvmLogger(jvmName)
-          val className = multiSimpleName(testClass)
-          val optionsFile = (srcDir ** (className + ".opts")).get.headOption
-          val optionsFromFile = optionsFile map (IO.read(_)) map (_.trim.split(" ").toList) getOrElse (Seq.empty[String])
-          val allJvmOptions = options.jvm ++ optionsFromFile ++ options.extra(className)
-          val scalaOptions = options.scala(testClass)
-          val connectInput = input && index == 0
-          log.debug("Starting %s for %s" format (jvmName, testClass))
-          log.debug("  with JVM options: %s" format allJvmOptions.mkString(" "))
-          (testClass, Jvm.startJvm(runWith.java, allJvmOptions, runWith.scala, scalaOptions, jvmLogger, connectInput))
-        }
+        val jvmName = "JVM-" + multiIdentifier(testClass, marker)
+        val jvmLogger = new JvmLogger(jvmName)
+        val className = multiSimpleName(testClass)
+        val optionsFile = (srcDir ** (className + ".opts")).get.headOption
+        val optionsFromFile = optionsFile map (IO.read(_)) map (_.trim.split(" ").toList) getOrElse (Seq.empty[String])
+        val allJvmOptions = options.jvm ++ optionsFromFile ++ options.extra(className)
+        val scalaOptions = options.scala(testClass)
+        val connectInput = input && index == 0
+        log.debug("Starting %s for %s" format (jvmName, testClass))
+        log.debug("  with JVM options: %s" format allJvmOptions.mkString(" "))
+        (testClass, Jvm.startJvm(runWith.java, allJvmOptions, runWith.scala, scalaOptions, jvmLogger, connectInput))
+      }
     }
     val exitCodes = processes map {
       case (testClass, process) => (testClass, process.exitValue)
