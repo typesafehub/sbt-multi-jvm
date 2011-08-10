@@ -7,6 +7,7 @@ import java.lang.Boolean.getBoolean
 import scala.Console.{ GREEN, RESET }
 
 object MultiJvmPlugin {
+
   case class RunWith(java: File, scala: ScalaInstance)
   case class Options(jvm: Seq[String], extra: String => Seq[String], scala: String => Seq[String])
 
@@ -26,19 +27,32 @@ object MultiJvmPlugin {
   val jvmOptions = SettingKey[Seq[String]]("jvm-options")
   val extraOptions = SettingKey[String => Seq[String]]("extra-options")
 
-  val scalatestRunner = SettingKey[String]("scalatest-runner")
-  val scalatestOptions = SettingKey[Seq[String]]("scalatest-options")
-  val scalatestClasspath = TaskKey[Classpath]("scalatest-classpath")
-  val scalatestScalaOptions = TaskKey[String => Seq[String]]("scalatest-scala-options")
+  val testRunner = SettingKey[String]("test-runner")
+  val testOptions = SettingKey[Seq[String]]("test-lib-options")
+  val testClasspath = TaskKey[Classpath]("test-classpath")
+  val testScalaOptions = TaskKey[String => Seq[String]]("test-scala-options")
   val multiTestOptions = TaskKey[Options]("multi-test-options")
 
   val appScalaOptions = TaskKey[String => Seq[String]]("app-scala-options")
   val connectInput = SettingKey[Boolean]("connect-input")
   val multiRunOptions = TaskKey[Options]("multi-run-options")
 
-  lazy val settings: Seq[Setting[_]] = inConfig(MultiJvm)(Defaults.configSettings ++ multiJvmSettings)
+  private def withSettings(settings: Setting[_]*): Seq[Setting[_]] = inConfig(MultiJvm)(Defaults.configSettings ++ multiJvmSettings ++ settings)
 
-  def multiJvmSettings = Seq(
+  lazy val settings = withSettings(
+    testRunner := "org.scalatest.tools.Runner",
+    testOptions := defaultTestOptions,
+    testClasspath <<= managedClasspath map { _.filter(_.data.name.contains("scalatest")) },
+    testScalaOptions <<= (testRunner, testOptions, testClasspath, fullClasspath) map scalaOptionsForScalatest
+  )
+
+  lazy val specs2Settings = withSettings(
+    testRunner := "specs2.run",
+    testOptions := defaultTestOptions,  
+    testScalaOptions <<= (testRunner, testOptions, fullClasspath, target) map scalaOptionsForSpecs2
+  )
+
+  def multiJvmSettings =  Seq(
     multiJvmMarker := "MultiJvm",
     loadedTestFrameworks <<= (loadedTestFrameworks in Test).identity,
     definedTests <<= Defaults.detectTests,
@@ -50,11 +64,7 @@ object MultiJvmPlugin {
     runWith <<= (java, scalaInstance) apply RunWith,
     jvmOptions := Seq.empty,
     extraOptions := { (name: String) => Seq.empty },
-    scalatestRunner := "org.scalatest.tools.Runner",
-    scalatestOptions := defaultScalatestOptions,
-    scalatestClasspath <<= managedClasspath map { _.filter(_.data.name.contains("scalatest")) },
-    scalatestScalaOptions <<= (scalatestRunner, scalatestOptions, scalatestClasspath, fullClasspath) map scalaOptionsForScalatest,
-    multiTestOptions <<= (jvmOptions, extraOptions, scalatestScalaOptions) map Options,
+    multiTestOptions <<= (jvmOptions, extraOptions, testScalaOptions) map Options,
     appScalaOptions <<= fullClasspath map scalaOptionsForApps,
     connectInput := true,
     multiRunOptions <<= (jvmOptions, extraOptions, appScalaOptions) map Options,
@@ -79,7 +89,7 @@ object MultiJvmPlugin {
     new File(new File(home, "bin"), name)
   }
 
-  def defaultScalatestOptions: Seq[String] = {
+  def defaultTestOptions: Seq[String] = {
     if (getBoolean("sbt.log.noformat")) Seq("-oW") else Seq("-o")
   }
 
@@ -88,6 +98,11 @@ object MultiJvmPlugin {
     val paths = "\"" + fullClasspath.files.map(_.absolutePath).mkString(" ", " ", " ") + "\""
     (testClass: String) => { Seq("-cp", cp, runner, "-s", testClass, "-p", paths) ++ options }
   }
+
+  def scalaOptionsForSpecs2(runner: String, options: Seq[String], fullClasspath: Classpath, target: File) = {  
+    val classpathFiles = (fullClasspath.files ++ (target * "scala-*" * "*classes").get).absString
+    (testClass: String) => { Seq("-cp", classpathFiles, runner, testClass) ++ options }
+  }  
 
   def scalaOptionsForApps(classpath: Classpath) = {
     val cp = classpath.files.absString
@@ -135,18 +150,18 @@ object MultiJvmPlugin {
     log.info(if (log.ansiCodesSupported) GREEN + logName + RESET else logName)
     val processes = classes.zipWithIndex map {
       case (testClass, index) => {
-        val jvmName = "JVM-" + multiIdentifier(testClass, marker)
-        val jvmLogger = new JvmLogger(jvmName)
-        val className = multiSimpleName(testClass)
-        val optionsFile = (srcDir ** (className + ".opts")).get.headOption
-        val optionsFromFile = optionsFile map (IO.read(_)) map (_.trim.split(" ").toList) getOrElse (Seq.empty[String])
-        val allJvmOptions = options.jvm ++ optionsFromFile ++ options.extra(className)
-        val scalaOptions = options.scala(testClass)
-        val connectInput = input && index == 0
-        log.debug("Starting %s for %s" format (jvmName, testClass))
-        log.debug("  with JVM options: %s" format allJvmOptions.mkString(" "))
-        (testClass, Jvm.startJvm(runWith.java, allJvmOptions, runWith.scala, scalaOptions, jvmLogger, connectInput))
-      }
+          val jvmName = "JVM-" + multiIdentifier(testClass, marker)
+          val jvmLogger = new JvmLogger(jvmName)
+          val className = multiSimpleName(testClass)
+          val optionsFile = (srcDir ** (className + ".opts")).get.headOption
+          val optionsFromFile = optionsFile map (IO.read(_)) map (_.trim.split(" ").toList) getOrElse (Seq.empty[String])
+          val allJvmOptions = options.jvm ++ optionsFromFile ++ options.extra(className)
+          val scalaOptions = options.scala(testClass)
+          val connectInput = input && index == 0
+          log.debug("Starting %s for %s" format (jvmName, testClass))
+          log.debug("  with JVM options: %s" format allJvmOptions.mkString(" "))
+          (testClass, Jvm.startJvm(runWith.java, allJvmOptions, runWith.scala, scalaOptions, jvmLogger, connectInput))
+        }
     }
     val exitCodes = processes map {
       case (testClass, process) => (testClass, process.exitValue)
