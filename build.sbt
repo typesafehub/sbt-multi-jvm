@@ -1,19 +1,28 @@
 
-sbtPlugin := true
-
 organization := "com.typesafe.sbt"
 
 name := "sbt-multi-jvm"
 
 version := "0.3.8-SNAPSHOT"
 
-publishMavenStyle := false
+scalacOptions ++= Seq(
+  "-unchecked",
+  "-deprecation",
+  "-Xlint",
+  "-language:_",
+  "-target:jvm-1.6",
+  "-encoding", "UTF-8"
+)
 
-publishTo <<= (version) { version: String =>
-  val scalasbt = "http://scalasbt.artifactoryonline.com/scalasbt/"
-  val (name, u) = if (version.contains("-SNAPSHOT")) ("sbt-plugin-snapshots", scalasbt+"sbt-plugin-snapshots")
-    else ("sbt-plugin-releases", scalasbt+"sbt-plugin-releases")
-  Some(Resolver.url(name, url(u))(Resolver.ivyStylePatterns))
+addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.9.2")
+
+sbtPlugin := true
+
+publishTo := {
+  val baseUrl = "http://scalasbt.artifactoryonline.com/scalasbt"
+  val kind = if (isSnapshot.value) "snapshots" else "releases"
+  val name = s"sbt-plugin-$kind"
+  Some(Resolver.url(s"publish-$name", url(s"$baseUrl/$name"))(Resolver.ivyStylePatterns))
 }
 
-addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.8.5")
+publishMavenStyle := false
