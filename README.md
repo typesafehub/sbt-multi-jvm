@@ -1,5 +1,5 @@
-!! THIS PLUGIN HAS MOVED TO sbt/sbt-multi-jvm !!
-=====================================================
+PLUGIN MOVED TO sbt/sbt-multi-jvm
+=================================
 In an effort to centralise all plugins under the [sbt organisation on github](https://github.com/sbt), 
 this plugin has moved to: https://github.com/sbt/sbt-multi-jvm 
 
