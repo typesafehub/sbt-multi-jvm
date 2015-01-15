@@ -1,7 +1,9 @@
 PLUGIN MOVED TO sbt/sbt-multi-jvm
 =================================
-In an effort to centralise all plugins under the [sbt organisation on github](https://github.com/sbt), 
-this plugin has moved to: https://github.com/sbt/sbt-multi-jvm 
+In an effort to centralise all plugins under the [sbt](https://github.com/sbt) organisation on github, 
+this plugin has moved to: 
+
+**https://github.com/sbt/sbt-multi-jvm**
 
 Where it will remain to be developed under the same terms and licenses as it was developed here.
 Please report all issues and pull requests to that repository.
