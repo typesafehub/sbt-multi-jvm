@@ -8,31 +8,6 @@ this plugin has moved to:
 Where it will remain to be developed under the same terms and licenses as it was developed here.
 Please report all issues and pull requests to that repository.
 
-sbt-multi-jvm
--------------
-
-An [sbt] plugin for running scalatest tests in multiple JVMs. This plugin
-requires sbt 0.12.x
-
-[sbt]: http://www.scala-sbt.org
-
-
-Add plugin
-----------
-
-To use the plugin in a project add the following to `project/plugins.sbt`:
-
-    addSbtPlugin("com.typesafe.sbt" % "sbt-multi-jvm" % "0.3.9")
-
-
-More information
-----------------
-
-For more information about using sbt-multi-jvm see the
-[akka documentation][akka-docs].
-
-[akka-docs]: http://akka.io/docs/akka/snapshot/dev/multi-jvm-testing.html
-
 License
 -------
 Copyright 2012 Typesafe, Inc.
